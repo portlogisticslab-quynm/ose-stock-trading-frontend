@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stock Trading Research & Paper Trading V2.0</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div>
+    <h1>Stock Trading Research & Paper Trading</h1>
+    <div class="subtitle">V2.0 · Frontend–Backend · Alpaca Paper</div>
+  </div>
+  <div class="status-row">
+    <span id="systemStatus" class="pill neutral">System: checking…</span>
+    <span id="paperStatus" class="pill warn">Alpaca: PAPER</span>
+    <button id="refreshAllBtn" class="btn">Refresh All</button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button class="tab active" data-tab="overview">Overview</button>
+  <button class="tab" data-tab="research">Research Signals</button>
+  <button class="tab" data-tab="macro">Macro & Sentiment</button>
+  <button class="tab" data-tab="paper">Paper Trading</button>
+  <button class="tab" data-tab="history">Portfolio & History</button>
+  <button class="tab" data-tab="position">Position Management</button>
+  <button class="tab" data-tab="monitor">Protection Monitor</button>
+  <button class="tab" data-tab="risk">Adaptive Risk & Bracket</button>
+  <button class="tab" data-tab="system">System & Logs</button>
+</nav>
+
+<main>
+<section id="overview" class="tabpane active">
+  <div class="cards four">
+    <div class="card"><div class="label">Portfolio Value</div><div id="portfolioValue" class="metric">—</div></div>
+    <div class="card"><div class="label">Cash</div><div id="cashValue" class="metric">—</div></div>
+    <div class="card"><div class="label">Buying Power</div><div id="buyingPower" class="metric">—</div></div>
+    <div class="card"><div class="label">P&amp;L Status</div><div id="pnlStatus" class="metric">—</div></div>
+  </div>
+  <div class="cards four">
+    <div class="card"><div class="label">Realized P&amp;L (FIFO est.)</div><div id="realizedPnl" class="metric">—</div></div>
+    <div class="card"><div class="label">Unrealized P&amp;L</div><div id="unrealizedPnl" class="metric">—</div></div>
+    <div class="card"><div class="label">Total P&amp;L</div><div id="totalPnl" class="metric">—</div></div>
+    <div class="card"><div class="label">P&amp;L Method</div><div class="metric small">FIFO + Open P&amp;L</div></div>
+  </div>
+  <div class="panel"><h2>Open Positions <span class="hint">Green = Profit · Red = Loss</span></h2><div class="tablewrap"><table><thead><tr><th>Symbol</th><th>Qty</th><th>Entry</th><th>Current</th><th>Market Value</th><th>P&amp;L</th><th>P&amp;L %</th></tr></thead><tbody id="positionsBody"></tbody></table></div></div>
+</section>
+
+<section id="research" class="tabpane">
+  <div class="toolbar"><label>Symbol <select id="researchSymbol"></select></label><label>Lookback <select id="researchDays"><option>100</option><option selected>300</option><option>500</option></select></label><button id="analyzeBtn" class="btn primary">Analyze</button></div>
+  <div class="cards four"><div class="card"><div class="label">Signal</div><div id="signalValue" class="metric">—</div></div><div class="card"><div class="label">Strength</div><div id="signalStrength" class="metric">—</div></div><div class="card"><div class="label">Quality</div><div id="signalQuality" class="metric">—</div></div><div class="card"><div class="label">Last Price</div><div id="signalPrice" class="metric">—</div></div></div>
+  <div class="panel"><h2>Reasoning</h2><pre id="researchReason">No analysis yet.</pre></div>
+  <div class="panel"><h2>Technical Indicators</h2><div id="indicatorGrid" class="kvgrid"></div></div>
+</section>
+
+<section id="macro" class="tabpane">
+  <div class="toolbar"><label>Symbol <select id="sentimentSymbol"></select></label><button id="macroBtn" class="btn primary">Refresh Macro</button><button id="sentimentBtn" class="btn">Refresh Sentiment</button></div>
+  <div class="panel"><h2>Macro Data</h2><div id="macroGrid" class="kvgrid"></div></div>
+  <div class="panel"><h2>News Sentiment</h2><div id="sentimentGrid" class="kvgrid"></div></div>
+</section>
+
+<section id="paper" class="tabpane">
+  <div class="warning">PAPER TRADING ONLY. Manual orders are explicit user actions.</div>
+  <div class="formgrid">
+    <label>Symbol <select id="tradeSymbol"></select></label><label>Side <select id="tradeSide"><option>buy</option><option>sell</option></select></label><label>Type <select id="tradeType"><option>market</option><option>limit</option></select></label><label>Qty <input id="tradeQty" type="number" min="1" value="1"></label><label>Limit Price <input id="tradeLimit" type="number" min="0" step="0.01" value="0"></label><button id="quoteBtn" class="btn">Refresh IEX Quote</button>
+  </div>
+  <div class="cards two"><div class="card"><div class="label">Reference Price</div><div id="quoteValue" class="metric">—</div></div><div class="card"><div class="label">Quote</div><div id="quoteDetail" class="metric small">—</div></div></div>
+  <button id="submitOrderBtn" class="btn danger">Submit Paper Order</button>
+  <pre id="paperLog">Ready.</pre>
+</section>
+
+<section id="history" class="tabpane">
+  <div class="toolbar"><button id="historyBtn" class="btn primary">Refresh Portfolio &amp; Trade History</button></div>
+  <div class="panel"><h2>Order History</h2><div class="tablewrap"><table><thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Type</th><th>Qty</th><th>Filled</th><th>Avg Price</th><th>Status</th><th>Order ID</th></tr></thead><tbody id="historyBody"></tbody></table></div></div>
+</section>
+
+<section id="position" class="tabpane">
+  <div class="toolbar"><label>Position <select id="positionSymbol"></select></label><button id="positionRefreshBtn" class="btn primary">Refresh Dynamic Exit</button><button id="reconcileBtn" class="btn">Bracket-Aware Reconcile</button><button id="repairPreviewBtn" class="btn">Preview Repair</button></div>
+  <div class="cards four"><div class="card"><div class="label">Phase</div><div id="exitPhase" class="metric small">—</div></div><div class="card"><div class="label">R Multiple</div><div id="rMultiple" class="metric">—</div></div><div class="card"><div class="label">Current Stop</div><div id="currentStop" class="metric">—</div></div><div class="card"><div class="label">Proposed Stop</div><div id="proposedStop" class="metric">—</div></div></div>
+  <div class="panel"><h2>Protection / Dynamic Exit</h2><pre id="positionLog">Select a position.</pre></div>
+  <div class="toolbar"><button id="applyStopBtn" class="btn danger" disabled>Apply Dynamic Stop</button><button id="repairBtn" class="btn danger" disabled>Create OCO Protection</button><button id="closeBtn" class="btn danger">Close Position PAPER</button></div>
+</section>
+
+<section id="monitor" class="tabpane">
+  <div class="toolbar"><button id="monitorToggleBtn" class="btn primary">START AUTO MONITOR</button><button id="monitorNowBtn" class="btn">CHECK NOW</button><label>Interval <select id="monitorInterval"><option value="30">30 sec</option><option value="60" selected>60 sec</option><option value="120">120 sec</option><option value="300">300 sec</option></select></label><span id="monitorOverall" class="pill neutral">Overall: NOT CHECKED</span></div>
+  <div class="cards four"><div class="card"><div class="label">Positions</div><div id="monPositions" class="metric">0</div></div><div class="card"><div class="label">Protected</div><div id="monProtected" class="metric">0</div></div><div class="card"><div class="label">Warnings</div><div id="monWarnings" class="metric">0</div></div><div class="card"><div class="label">Critical</div><div id="monCritical" class="metric">0</div></div></div>
+  <div class="panel"><h2>Read-only Protection Monitor</h2><div class="tablewrap"><table><thead><tr><th>Symbol</th><th>Qty</th><th>Protected</th><th>Coverage %</th><th>Unprotected</th><th>Overprotected</th><th>Status</th><th>Severity</th><th>Valid Groups</th><th>Unlinked Exits</th><th>History</th></tr></thead><tbody id="monitorBody"></tbody></table></div></div>
+</section>
+
+<section id="risk" class="tabpane">
+  <div class="warning">ALPACA PAPER ONLY · ATR-based Stop/Take · Position Sizing · Portfolio Exposure · BUY Bracket</div>
+  <div class="formgrid"><label>Symbol <select id="riskSymbol"></select></label><label>Entry Type <select id="riskEntryType"><option value="market">MARKET</option><option value="limit">LIMIT</option></select></label><label>Entry / Limit Price <input id="riskEntry" type="number" min="0" step="0.01"></label><label>Qty <input id="riskQty" type="number" min="1" value="1"></label><button id="riskQuoteBtn" class="btn">Refresh IEX Quote</button><button id="riskCalcBtn" class="btn primary">CALCULATE ADAPTIVE RISK</button></div>
+  <div class="cards four"><div class="card"><div class="label">ATR</div><div id="riskAtr" class="metric">—</div></div><div class="card"><div class="label">Stop</div><div id="riskStop" class="metric">—</div></div><div class="card"><div class="label">Take Profit</div><div id="riskTake" class="metric">—</div></div><div class="card"><div class="label">Recommended Qty</div><div id="riskRecommended" class="metric">—</div></div></div>
+  <div class="toolbar"><button id="useQtyBtn" class="btn">Use Recommended Qty</button><button id="gateBtn" class="btn">RUN PRE-TRADE GATE</button><span id="gateStatus" class="pill neutral">Gate: NOT RUN</span><button id="bracketBtn" class="btn danger" disabled>SUBMIT BRACKET PAPER</button></div>
+  <pre id="riskLog">Adaptive risk has not been calculated.</pre>
+</section>
+
+<section id="system" class="tabpane">
+  <div class="toolbar"><button id="healthBtn" class="btn primary">Run System Test</button><button id="configBtn" class="btn">Load Configuration</button></div>
+  <pre id="systemLog">System test has not been run.</pre>
+</section>
+</main>
+
+<footer><strong>Copyright © 2026 Portlogistics.vn. All rights reserved</strong></footer>
+<script src="config.js"></script><script src="app.js"></script>
+</body></html>
