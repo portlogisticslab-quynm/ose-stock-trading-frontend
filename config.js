@@ -1,4 +1,4 @@
 window.APP_CONFIG = {
-  API_BASE_URL: 'https://ose-stock-trading-backend.onrender.com',
-  VERSION: '2.0.0'
+  API_BASE_URL: 'http://127.0.0.1:8000',
+  VERSION: '2.0.1'
 };

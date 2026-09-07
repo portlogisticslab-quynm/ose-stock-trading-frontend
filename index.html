@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Stock Trading Research & Paper Trading V2.0</title>
+  <title>Stock Trading Research & Paper Trading V2.0.1</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 <header class="topbar">
   <div>
     <h1>Stock Trading Research & Paper Trading</h1>
-    <div class="subtitle">V2.0 · Frontend–Backend · Alpaca Paper</div>
+    <div class="subtitle">V2.0.1 · Unified Research Signal Engine · Alpaca Paper</div>
   </div>
   <div class="status-row">
     <span id="systemStatus" class="pill neutral">System: checking…</span>
@@ -50,8 +50,9 @@
 
 <section id="research" class="tabpane">
   <div class="toolbar"><label>Symbol <select id="researchSymbol"></select></label><label>Lookback <select id="researchDays"><option>100</option><option selected>300</option><option>500</option></select></label><button id="analyzeBtn" class="btn primary">Analyze</button></div>
-  <div class="cards four"><div class="card"><div class="label">Signal</div><div id="signalValue" class="metric">—</div></div><div class="card"><div class="label">Strength</div><div id="signalStrength" class="metric">—</div></div><div class="card"><div class="label">Quality</div><div id="signalQuality" class="metric">—</div></div><div class="card"><div class="label">Last Price</div><div id="signalPrice" class="metric">—</div></div></div>
+  <div class="cards four"><div class="card"><div class="label">Signal</div><div id="signalValue" class="metric">—</div></div><div class="card"><div class="label">Strength</div><div id="signalStrength" class="metric">—</div></div><div class="card"><div class="label">Signal Quality</div><div id="signalQuality" class="metric">—</div></div><div class="card"><div class="label">Last Price</div><div id="signalPrice" class="metric">—</div></div></div>
   <div class="panel"><h2>Reasoning</h2><pre id="researchReason">No analysis yet.</pre></div>
+  <div class="panel"><h2>Unified Engine Diagnostics</h2><div id="researchDiagnostics" class="kvgrid"></div></div>
   <div class="panel"><h2>Technical Indicators</h2><div id="indicatorGrid" class="kvgrid"></div></div>
 </section>
 
