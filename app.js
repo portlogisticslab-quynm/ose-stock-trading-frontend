@@ -12,7 +12,7 @@ function json(x){return JSON.stringify(x,null,2)}
 function kv(el,obj){el.innerHTML=Object.entries(obj||{}).map(([k,v])=>`<div class="kv"><b>${esc(k)}</b>${esc(typeof v==='object'?JSON.stringify(v):v)}</div>`).join('')||'<div class="kv">No data</div>'}
 function optionize(select,items){const old=select.value;select.innerHTML=items.map(x=>`<option>${esc(x)}</option>`).join('');if(items.includes(old))select.value=old}
 
-for(const b of document.querySelectorAll('.tab')) b.onclick=()=>{document.querySelectorAll('.tab,.tabpane').forEach(x=>x.classList.remove('active'));b.classList.add('active');$(b.dataset.tab).classList.add('active')};
+for(const b of document.querySelectorAll('.tab')) b.onclick=()=>{document.querySelectorAll('.tab,.tabpane').forEach(x=>x.classList.remove('active'));b.classList.add('active');$(b.dataset.tab).classList.add('active');if(b.dataset.tab==='dashboard')dashboardActivate()};
 
 async function loadConfig(){const c=await api('/api/config');state.config=c;const list=[...new Set([...(c.watchlist||[]),...SWING_SYMBOLS])];['researchSymbol','sentimentSymbol','tradeSymbol','riskSymbol'].forEach(id=>optionize($(id),list));$('systemLog').textContent=json(c);return c}
 async function health(){try{const h=await api('/api/health');$('systemStatus').textContent=h.ok?'System: PASS':'System: CHECK';$('systemStatus').className='pill '+(h.ok?'ok':'warn');$('systemLog').textContent=json(h);$('paperStatus').textContent=h.checks?.paper_account?'Alpaca: PAPER':'Alpaca: CHECK';$('paperStatus').className='pill '+(h.checks?.paper_account?'ok':'bad')}catch(e){$('systemStatus').textContent='System: ERROR';$('systemStatus').className='pill bad';$('systemLog').textContent=e.message}}
@@ -86,3 +86,92 @@ $('swingLoad').onclick=loadSwing;$('swingCsv').onclick=exportSwingCsv;$('swingRe
 $('refreshAllBtn').onclick=refreshAll;$('healthBtn').onclick=health;$('configBtn').onclick=loadConfig;$('analyzeBtn').onclick=analyze;$('macroBtn').onclick=macro;$('sentimentBtn').onclick=sentiment;$('quoteBtn').onclick=paperQuote;$('submitOrderBtn').onclick=submitOrder;$('historyBtn').onclick=history;$('riskQuoteBtn').onclick=riskQuote;$('riskCalcBtn').onclick=calcRisk;$('useQtyBtn').onclick=useQty;$('gateBtn').onclick=gate;$('bracketBtn').onclick=bracket;$('positionRefreshBtn').onclick=dynamicExit;$('reconcileBtn').onclick=reconcile;$('repairPreviewBtn').onclick=repairPreview;$('repairBtn').onclick=repair;$('applyStopBtn').onclick=applyStop;$('closeBtn').onclick=closePosition;$('monitorNowBtn').onclick=monitor;$('monitorToggleBtn').onclick=toggleMonitor;
 
 (async()=>{try{await loadConfig()}catch(e){$('systemLog').textContent='Config error: '+e.message}await refreshAll()})();
+
+// Dashboard v2.4: read-only technical chart; no paper-order interaction.
+let dashData=null, dashHover=-1, dashStarted=false;
+const DASH_SYMBOLS=['SPY','NVDA','MSFT','AAPL','TSLA','GOOGL','ADBE','META','QCOM','AMZN','AVGO','CRWV','INTC','ORCL','PLTR'];
+function dashboardActivate(){
+ if(!dashStarted){dashStarted=true;const sel=$('dashSymbol');sel.innerHTML=DASH_SYMBOLS.map(s=>`<option value="${s}">${s}</option>`).join('');
+  $('dashRefresh').onclick=dashboardLoad;
+  for(const id of ['dashPeriod','dashChartType','dashEMA','dashBB','dashLevels','dashATR']) $(id).addEventListener('change',()=>{if(id==='dashPeriod')dashboardLoad();else dashboardDraw()});
+  for(const id of ['dashPrice','dashVolume','dashMacd','dashRsi','dashAtr']){
+   const c=$(id);c.addEventListener('pointermove',e=>{if(!dashData)return;const r=c.getBoundingClientRect();const n=dashData.visible.length;dashHover=Math.max(0,Math.min(n-1,Math.floor((e.clientX-r.left-52)/(r.width-68)*n)));dashboardDraw()});
+   c.addEventListener('pointerleave',()=>{dashHover=-1;dashboardDraw()});
+  }
+  window.addEventListener('resize',()=>{if($('dashboard').classList.contains('active'))dashboardDraw()});
+  dashboardLoad();
+ }else dashboardDraw();
+}
+function dashEma(values,period){let v=null;return values.map((x,i)=>{if(i===period-1){v=values.slice(0,period).reduce((a,b)=>a+b,0)/period;return v}if(v===null)return null;v=x*2/(period+1)+v*(1-2/(period+1));return v})}
+function dashSma(values,n){return values.map((_,i)=>i<n-1?null:values.slice(i-n+1,i+1).reduce((a,b)=>a+b,0)/n)}
+function dashCalc(bars){
+ const close=bars.map(b=>b.close), e12=dashEma(close,12),e26=dashEma(close,26);
+ const macd=close.map((_,i)=>e12[i]===null||e26[i]===null?null:e12[i]-e26[i]);
+ let signal=null;const sig=macd.map((x,i)=>{if(x===null)return null;if(signal===null){const prev=macd.slice(0,i+1).filter(v=>v!==null);if(prev.length<9)return null;signal=prev.slice(-9).reduce((a,b)=>a+b,0)/9;return signal}signal=x*.2+signal*.8;return signal});
+ const gains=close.map((x,i)=>i?Math.max(0,x-close[i-1]):0),losses=close.map((x,i)=>i?Math.max(0,close[i-1]-x):0);
+ let avgG=0,avgL=0;const rsi=close.map((_,i)=>{if(i<14)return null;if(i===14){avgG=gains.slice(1,15).reduce((a,b)=>a+b,0)/14;avgL=losses.slice(1,15).reduce((a,b)=>a+b,0)/14}else{avgG=(avgG*13+gains[i])/14;avgL=(avgL*13+losses[i])/14}return avgL===0?(avgG===0?50:100):100-100/(1+avgG/avgL)});
+ const tr=bars.map((b,i)=>Math.max(b.high-b.low,Math.abs(b.high-(i?close[i-1]:b.close)),Math.abs(b.low-(i?close[i-1]:b.close))));
+ let a=null;const atr=tr.map((x,i)=>{if(i<13)return null;if(i===13)a=tr.slice(0,14).reduce((v,w)=>v+w,0)/14;else a=(a*13+x)/14;return a});
+ const mean=dashSma(close,20),std=close.map((_,i)=>i<19?null:Math.sqrt(close.slice(i-19,i+1).reduce((v,w)=>v+(w-mean[i])**2,0)/20));
+ return bars.map((b,i)=>({...b,ema20:dashEma20[i],ema50:dashEma50[i],bbHigh:mean[i]===null?null:mean[i]+2*std[i],bbLow:mean[i]===null?null:mean[i]-2*std[i],macd:macd[i],signal:sig[i],hist:sig[i]===null?null:macd[i]-sig[i],rsi:rsi[i],atr:atr[i]}));
+}
+let dashEma20=[],dashEma50=[];
+async function dashboardLoad(){
+ const symbol=$('dashSymbol').value,days=Number($('dashPeriod').value);$('dashStatus').textContent='Loading '+symbol+'…';
+ try{const response=await api(`/api/dashboard/${encodeURIComponent(symbol)}?days=${Math.min(520,days+110)}`);
+ const bars=(response.bars||[]).map(b=>({...b,date:String(b.datetime).slice(0,10),open:+b.open,high:+b.high,low:+b.low,close:+b.close,volume:+b.volume})).filter(b=>[b.open,b.high,b.low,b.close,b.volume].every(Number.isFinite));
+ if(bars.length<35)throw Error('Insufficient closed daily candles for technical indicators');
+ const close=bars.map(b=>b.close);dashEma20=dashEma(close,20);dashEma50=dashEma(close,50);
+ const enriched=dashCalc(bars),latest=bars[bars.length-1].date;
+ const cutoff=new Date(latest+'T12:00:00Z');cutoff.setUTCDate(cutoff.getUTCDate()-days+1);
+ const idx=enriched.findIndex(b=>b.date>=cutoff.toISOString().slice(0,10));const start=idx<0?0:idx;
+ dashData={symbol,visible:enriched.slice(start),source:response.data_source};dashHover=-1;
+ $('dashStatus').textContent=`${symbol} · ${dashData.visible.length} closed daily candles · latest ${latest} · ${response.data_source} · research only`;
+ dashboardDraw();
+ }catch(e){dashData=null;$('dashStatus').textContent='Chart unavailable: '+e.message;for(const id of ['dashPrice','dashVolume','dashMacd','dashRsi','dashAtr']){const c=$(id),ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height)}$('dashMetrics').textContent='';}
+}
+function dashCanvas(id){
+ const c=$(id),frame=c.parentElement;
+ const heights={dashPrice:400,dashVolume:145,dashMacd:210,dashRsi:180,dashAtr:160};
+ const h=heights[id]||180;
+ frame.style.height=h+'px';frame.style.minHeight=h+'px';
+ const w=Math.max(280,Math.floor(frame.getBoundingClientRect().width));
+ const dpr=Math.min(window.devicePixelRatio||1,3);
+ c.style.width='100%';c.style.height='100%';
+ const pw=Math.round(w*dpr),ph=Math.round(h*dpr);
+ if(c.width!==pw)c.width=pw;
+ if(c.height!==ph)c.height=ph;
+ const ctx=c.getContext('2d');
+ ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+ return {ctx,w,h,left:52,right:w-16,top:16,bottom:h-28};
+}
+function dashPlot(id,series,opts={}){
+ const {ctx,w,h,left,right,top,bottom}=dashCanvas(id),bars=dashData.visible,n=bars.length,plotW=right-left;
+ let values=series.flatMap(s=>bars.map(b=>b[s.key]).filter(Number.isFinite));if(opts.candles)values.push(...bars.flatMap(b=>[b.high,b.low]));if(opts.levels)values.push(...opts.levels.map(x=>x.price));
+ let min=opts.min??Math.min(...values),max=opts.max??Math.max(...values);if(!Number.isFinite(min)||!Number.isFinite(max))return;
+ if(opts.zero){min=Math.min(min,0);max=Math.max(max,0)}if(max<=min){max=min+1}const pad=(max-min)*.06;min-=pad;max+=pad;
+ const x=i=>left+(i+.5)*plotW/n,y=v=>bottom-(v-min)/(max-min)*(bottom-top);
+ ctx.font='11px Segoe UI, sans-serif';ctx.textAlign='right';ctx.fillStyle='#667383';ctx.strokeStyle='#e7edf3';ctx.lineWidth=1;
+ for(let j=0;j<=4;j++){const v=min+(max-min)*j/4,py=y(v);ctx.beginPath();ctx.moveTo(left,py);ctx.lineTo(right,py);ctx.stroke();ctx.fillText(v.toLocaleString(undefined,{maximumFractionDigits:opts.volume?0:2}),left-6,py+3)}
+ if(opts.thresholds)for(const t of opts.thresholds){ctx.strokeStyle='#b6a2dc';ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(left,y(t));ctx.lineTo(right,y(t));ctx.stroke();ctx.setLineDash([])}
+ if(opts.zero){ctx.strokeStyle='#b6bec7';ctx.beginPath();ctx.moveTo(left,y(0));ctx.lineTo(right,y(0));ctx.stroke()}
+ if(opts.candles){const candleW=Math.max(1,Math.min(9,plotW/n*.68));bars.forEach((b,i)=>{const color=b.close>=b.open?'#15956b':'#d85060';ctx.strokeStyle=color;ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(x(i),y(b.low));ctx.lineTo(x(i),y(b.high));ctx.stroke();const a=y(Math.max(b.open,b.close)),z=y(Math.min(b.open,b.close));ctx.fillRect(x(i)-candleW/2,a,candleW,Math.max(1,z-a))})}
+ if(opts.linePrice){series.unshift({key:'close',color:'#2179c4',width:2})}
+ if(opts.histogram){const s=series.find(v=>v.key==='hist');bars.forEach((b,i)=>{const v=b.hist;if(!Number.isFinite(v))return;ctx.fillStyle=v>=0?'#58b7a1':'#e49a9f';ctx.fillRect(x(i)-Math.max(.5,plotW/n*.35),Math.min(y(v),y(0)),Math.max(1,plotW/n*.7),Math.max(1,Math.abs(y(v)-y(0))))});series=series.filter(v=>v.key!=='hist')}
+ if(opts.bars)for(const s of series){bars.forEach((b,i)=>{const v=b[s.key];if(!Number.isFinite(v))return;ctx.fillStyle=s.colorFn?s.colorFn(b):s.color;const zero=opts.zero?y(0):bottom;ctx.fillRect(x(i)-Math.max(.5,plotW/n*.35),Math.min(y(v),zero),Math.max(1,plotW/n*.7),Math.max(1,Math.abs(y(v)-zero)))})}
+ else for(const s of series){ctx.beginPath();ctx.strokeStyle=s.color;ctx.lineWidth=s.width||1.7;let begun=false;bars.forEach((b,i)=>{const v=b[s.key];if(!Number.isFinite(v)){begun=false;return}if(!begun)ctx.moveTo(x(i),y(v));else ctx.lineTo(x(i),y(v));begun=true});ctx.stroke()}
+ if(opts.levels)for(const level of opts.levels){ctx.strokeStyle=level.color;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(left,y(level.price));ctx.lineTo(right,y(level.price));ctx.stroke();ctx.setLineDash([]);ctx.textAlign='right';ctx.fillStyle=level.color;ctx.fillText(level.name+' '+level.price.toFixed(2),right-4,Math.max(top+9,Math.min(bottom-3,y(level.price)-3)))}
+ const step=Math.max(1,Math.ceil(n/6));ctx.fillStyle='#738293';ctx.textAlign='center';for(let i=0;i<n;i+=step)ctx.fillText(bars[i].date.slice(5),x(i),h-7);
+ if(dashHover>=0&&dashHover<n){ctx.strokeStyle='#8994a5';ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(x(dashHover),top);ctx.lineTo(x(dashHover),bottom);ctx.stroke();ctx.setLineDash([])}
+}
+function dashboardDraw(){if(!dashData)return;const b=dashData.visible,last=b[dashHover>=0?dashHover:b.length-1],fmt=v=>Number.isFinite(v)?v.toFixed(2):'—';
+ $('dashMetrics').textContent=`${last.date}  O ${fmt(last.open)}  H ${fmt(last.high)}  L ${fmt(last.low)}  C ${fmt(last.close)}  Volume ${Math.round(last.volume).toLocaleString()}  RSI ${fmt(last.rsi)}  ATR ${fmt(last.atr)}  MACD ${fmt(last.macd)}`;
+ const s=[];if($('dashEMA').checked)s.push({key:'ema20',color:'#e4a019'},{key:'ema50',color:'#8b5cf6'});if($('dashBB').checked)s.push({key:'bbHigh',color:'#8db9d8'},{key:'bbLow',color:'#8db9d8'});
+ let levels=[];if($('dashLevels').checked){const row=typeof swingRows!=='undefined'?swingRows.find(r=>r.symbol===dashData.symbol&&!r.error):null;if(row)for(const [key,name,color] of [['entry','Entry','#1466b3'],['stop','Stop','#ce3c4c'],['tp1','TP1','#188a67'],['tp2','TP2','#188a67']])if(Number.isFinite(Number(row[key]))&&row[key]!=null)levels.push({price:Number(row[key]),name,color})}
+ dashPlot('dashPrice',s,{candles:$('dashChartType').value==='candle',linePrice:$('dashChartType').value==='line',levels});
+ dashPlot('dashVolume',[{key:'volume',color:'#16a085',colorFn:x=>x.close>=x.open?'#54bca1':'#e9a2a9'}],{bars:true,volume:true,min:0});
+ // MACD histogram and two overlay lines share a common scale.
+ dashPlot('dashMacd',[{key:'macd',color:'#1f2937'},{key:'signal',color:'#e35b45'},{key:'hist',color:'#16a085'}],{zero:true,histogram:true});
+ dashPlot('dashRsi',[{key:'rsi',color:'#8b5cf6'}],{min:0,max:100,thresholds:[30,70]});
+ $('dashAtrPanel').hidden=!$('dashATR').checked;if($('dashATR').checked)dashPlot('dashAtr',[{key:'atr',color:'#d48b22'}],{min:0});
+}

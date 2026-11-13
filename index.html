@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Stock Trading Research & Paper Trading V2.0.1</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>Stock Trading Research & Paper Trading V2.4</title>
+  <link rel="stylesheet" href="styles.css?v=2.4.2" />
 </head>
 <body>
 <header class="topbar">
   <div>
     <h1>Stock Trading Research & Paper Trading</h1>
-    <div class="subtitle">V2.0.1 · Unified Research Signal Engine · Alpaca Paper</div>
+    <div class="subtitle">V2.4 · Unified Research Signal Engine · Alpaca Paper</div>
   </div>
   <div class="status-row">
     <span id="systemStatus" class="pill neutral">System: checking…</span>
@@ -21,6 +21,7 @@
 
 <nav class="tabs" id="tabs">
   <button class="tab active" data-tab="overview">Overview</button>
+  <button class="tab" data-tab="dashboard">Dashboard</button>
   <button class="tab" data-tab="swing">Swing Analytics</button>
   <button class="tab" data-tab="research">Research Signals</button>
   <button class="tab" data-tab="macro">Macro & Sentiment</button>
@@ -47,6 +48,30 @@
     <div class="card"><div class="label">P&amp;L Method</div><div class="metric small">FIFO + Open P&amp;L</div></div>
   </div>
   <div class="panel"><h2>Open Positions <span class="hint">Green = Profit · Red = Loss</span></h2><div class="tablewrap"><table><thead><tr><th>Symbol</th><th>Qty</th><th>Entry</th><th>Current</th><th>Market Value</th><th>P&amp;L</th><th>P&amp;L %</th></tr></thead><tbody id="positionsBody"></tbody></table></div></div>
+</section>
+
+<section id="dashboard" class="tabpane">
+  <div class="panel">
+    <h2>Technical Dashboard <span class="hint">Alpaca IEX · daily closed candles · research only</span></h2>
+    <div class="dashboard-controls">
+      <label>Symbol <select id="dashSymbol"></select></label>
+      <label>Period <select id="dashPeriod"><option value="30">1M</option><option value="90">3M</option><option value="180" selected>6M</option><option value="365">1Y</option></select></label>
+      <label>Price chart <select id="dashChartType"><option value="candle">Candlesticks</option><option value="line">Line</option></select></label>
+      <label><input type="checkbox" id="dashEMA" checked> EMA20 / EMA50</label>
+      <label><input type="checkbox" id="dashBB"> Bollinger (20,2)</label>
+      <label><input type="checkbox" id="dashLevels" checked> Swing levels</label>
+      <label><input type="checkbox" id="dashATR"> ATR14 panel</label>
+      <button class="btn primary" id="dashRefresh">Refresh chart</button>
+    </div>
+    <p id="dashStatus" class="muted" role="status">Select a symbol to load the chart.</p>
+    <div id="dashMetrics" class="dash-metrics"></div>
+  </div>
+  <div class="panel dash-panel"><h3>Price · EMA · Bollinger · Swing levels</h3><div class="dash-chart-frame" style="height:400px;min-height:400px"><canvas id="dashPrice"></canvas></div></div>
+  <div class="panel dash-panel"><h3>Volume (IEX)</h3><div class="dash-chart-frame" style="height:145px;min-height:145px"><canvas id="dashVolume"></canvas></div></div>
+  <div class="panel dash-panel"><h3>MACD (12, 26, 9) · histogram</h3><div class="dash-chart-frame" style="height:210px;min-height:210px"><canvas id="dashMacd"></canvas></div></div>
+  <div class="panel dash-panel"><h3>RSI (14) · thresholds 30 / 70</h3><div class="dash-chart-frame" style="height:180px;min-height:180px"><canvas id="dashRsi"></canvas></div></div>
+  <div class="panel dash-panel" id="dashAtrPanel" hidden><h3>ATR (14)</h3><div class="dash-chart-frame" style="height:160px;min-height:160px"><canvas id="dashAtr"></canvas></div></div>
+  <p class="hint">Charts use historical IEX data (not consolidated US volume). Signals/levels are scenarios, not orders. 16:30 New York time filter is not an official market calendar. Hover/touch chart to inspect a daily candle.</p>
 </section>
 
 <section id="swing" class="tabpane">
@@ -115,5 +140,5 @@
 </main>
 
 <footer><strong>Copyright © 2026 Portlogistics.vn. All rights reserved</strong></footer>
-<script src="config.js"></script><script src="app.js"></script>
+<script src="config.js"></script><script src="app.js?v=2.4.2"></script>
 </body></html>
