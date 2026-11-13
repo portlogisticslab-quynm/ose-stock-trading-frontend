@@ -21,6 +21,7 @@
 
 <nav class="tabs" id="tabs">
   <button class="tab active" data-tab="overview">Overview</button>
+  <button class="tab" data-tab="swing">Swing Analytics</button>
   <button class="tab" data-tab="research">Research Signals</button>
   <button class="tab" data-tab="macro">Macro & Sentiment</button>
   <button class="tab" data-tab="paper">Paper Trading</button>
@@ -48,6 +49,15 @@
   <div class="panel"><h2>Open Positions <span class="hint">Green = Profit · Red = Loss</span></h2><div class="tablewrap"><table><thead><tr><th>Symbol</th><th>Qty</th><th>Entry</th><th>Current</th><th>Market Value</th><th>P&amp;L</th><th>P&amp;L %</th></tr></thead><tbody id="positionsBody"></tbody></table></div></div>
 </section>
 
+<section id="swing" class="tabpane">
+ <div class="panel"><h2>Swing Trading Analytics v2.3 — Research only</h2><p>15 symbols · Snapshot based on backend responses. Missing fields remain N/A; no fabricated indicators or prices.</p>
+ <label>Account USD <input id="swingCapital" type="number" value="25000" min="1" step="100"></label>
+ <label>Risk/trade % <input id="swingRisk" type="number" value="0.5" min="0.01" max="10" step="0.1"></label>
+ <label>Position cap USD <input id="swingCap" type="number" value="5000" min="1" step="100"></label>
+ <button class="btn" id="swingLoad">Refresh 15 symbols</button> <button class="btn" id="swingCsv">Export CSV</button> <button class="btn" id="swingReport">Tải báo cáo tiếng Việt</button>
+ <p id="swingSource" class="muted">Dữ liệu: Alpaca IEX · Chỉ dùng nến ngày đã hoàn tất · Không phải tín hiệu đặt lệnh.</p><p id="swingStatus">Not loaded. Data availability depends on the configured backend.</p></div>
+ <div class="panel tablewrap"><table><thead><tr><th>Rank</th><th>Score</th><th>Symbol</th><th>Close / reference</th><th>EMA20</th><th>EMA50</th><th>RSI14</th><th>ATR14</th><th>MACD</th><th>Signal</th><th>Entry*</th><th>Stop*</th><th>TP1*</th><th>TP2*</th><th>Max shares*</th></tr></thead><tbody id="swingBody"></tbody></table><p>* Planning levels are calculated only when ATR and a price are supplied by the backend; Entry = max(latest high, prior 20-session high) × 1.003; SL = Entry − 1.2 × ATR14; TP1/TP2 = 1R/2R. Conditional planning levels only, not live triggers.</p></div>
+ </section>
 <section id="research" class="tabpane">
   <div class="toolbar"><label>Symbol <select id="researchSymbol"></select></label><label>Lookback <select id="researchDays"><option>100</option><option selected>300</option><option>500</option></select></label><button id="analyzeBtn" class="btn primary">Analyze</button></div>
   <div class="cards four"><div class="card"><div class="label">Signal</div><div id="signalValue" class="metric">—</div></div><div class="card"><div class="label">Strength</div><div id="signalStrength" class="metric">—</div></div><div class="card"><div class="label">Signal Quality</div><div id="signalQuality" class="metric">—</div></div><div class="card"><div class="label">Last Price</div><div id="signalPrice" class="metric">—</div></div></div>
