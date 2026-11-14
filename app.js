@@ -12,7 +12,7 @@ function json(x){return JSON.stringify(x,null,2)}
 function kv(el,obj){el.innerHTML=Object.entries(obj||{}).map(([k,v])=>`<div class="kv"><b>${esc(k)}</b>${esc(typeof v==='object'?JSON.stringify(v):v)}</div>`).join('')||'<div class="kv">No data</div>'}
 function optionize(select,items){const old=select.value;select.innerHTML=items.map(x=>`<option>${esc(x)}</option>`).join('');if(items.includes(old))select.value=old}
 
-for(const b of document.querySelectorAll('.tab')) b.onclick=()=>{document.querySelectorAll('.tab,.tabpane').forEach(x=>x.classList.remove('active'));b.classList.add('active');$(b.dataset.tab).classList.add('active');if(b.dataset.tab==='dashboard')dashboardActivate()};
+for(const b of document.querySelectorAll('.tab')) b.onclick=()=>{document.querySelectorAll('.tab,.tabpane').forEach(x=>x.classList.remove('active'));b.classList.add('active');$(b.dataset.tab).classList.add('active');if(b.dataset.tab==='dashboard')dashboardActivate();if(b.dataset.tab==='forecast')forecastActivate()};
 
 async function loadConfig(){const c=await api('/api/config');state.config=c;const list=[...new Set([...(c.watchlist||[]),...SWING_SYMBOLS])];['researchSymbol','sentimentSymbol','tradeSymbol','riskSymbol'].forEach(id=>optionize($(id),list));$('systemLog').textContent=json(c);return c}
 async function health(){try{const h=await api('/api/health');$('systemStatus').textContent=h.ok?'System: PASS':'System: CHECK';$('systemStatus').className='pill '+(h.ok?'ok':'warn');$('systemLog').textContent=json(h);$('paperStatus').textContent=h.checks?.paper_account?'Alpaca: PAPER':'Alpaca: CHECK';$('paperStatus').className='pill '+(h.checks?.paper_account?'ok':'bad')}catch(e){$('systemStatus').textContent='System: ERROR';$('systemStatus').className='pill bad';$('systemLog').textContent=e.message}}
@@ -174,4 +174,91 @@ function dashboardDraw(){if(!dashData)return;const b=dashData.visible,last=b[das
  dashPlot('dashMacd',[{key:'macd',color:'#1f2937'},{key:'signal',color:'#e35b45'},{key:'hist',color:'#16a085'}],{zero:true,histogram:true});
  dashPlot('dashRsi',[{key:'rsi',color:'#8b5cf6'}],{min:0,max:100,thresholds:[30,70]});
  $('dashAtrPanel').hidden=!$('dashATR').checked;if($('dashATR').checked)dashPlot('dashAtr',[{key:'atr',color:'#d48b22'}],{min:0});
+}
+
+
+// v2.5: read-only statistical forecast. No order endpoint calls.
+let fcData=null, fcReady=false;
+function forecastActivate(){
+ if(!fcReady){fcReady=true;const sel=$('fcSymbol');sel.innerHTML=DASH_SYMBOLS.map(s=>`<option value="${s}">${s}</option>`).join('');
+  $('fcRefresh').onclick=forecastLoad;forecastPerformanceInit();$('fcHorizon').onchange=forecastLoad;$('fcSymbol').onchange=()=>{forecastLoad();forecastPerformanceLoad();forecastReportLoad()};
+  window.addEventListener('resize',()=>{if($('forecast').classList.contains('active'))forecastDraw()});forecastLoad();
+ }else forecastDraw();
+}
+async function forecastLoad(){
+ const sym=$('fcSymbol').value,h=Number($('fcHorizon').value);$('fcStatus').textContent='Loading '+sym+'...';
+ try{fcData=await api(`/api/forecast/${encodeURIComponent(sym)}?horizon=${h}`);
+  const d=fcData,fmt=x=>Number.isFinite(Number(x))?Number(x).toFixed(2):'—';
+  const pct=Number(d.expected_return_pct),prob=Number(d.model_probability_up);
+  const tone=d.signal==='Buy'?'fc-positive':d.signal==='Sell'?'fc-negative':'fc-neutral';
+  $('fcStatus').textContent=`${d.symbol} · Last closed bar: ${d.asof} · ${d.horizon} trading sessions ahead`;
+  const items=[['Signal',d.signal,tone],['Last close','$'+fmt(d.last_close),''],['Median return',(pct>0?'+':'')+fmt(pct)+'%',pct>0?'fc-positive':pct<0?'fc-negative':''],['Model P(up)',fmt(prob*100)+'%',''],['Swing score',d.swing_score??'N/A','']];
+  $('fcMetrics').innerHTML=items.map(([k,v,cl])=>`<div class="fc-kpi"><div class="fc-kpi-label">${esc(k)}</div><div class="fc-kpi-value ${cl}">${esc(v)}</div></div>`).join('');
+  $('fcTable').innerHTML=d.forecast.map(p=>`<tr>${[p.session,p.median,p.low80,p.high80,p.low95,p.high95].map((v,i)=>`<td>${i?esc(fmt(v)):esc(v)}</td>`).join('')}</tr>`).join('');
+  const yesno=x=>x?'<span class="fc-confirm yes">Confirmed</span>':'<span class="fc-confirm no">Not confirmed</span>';
+  $('fcSignalDetail').innerHTML=`<div class="fc-signal ${tone}">${esc(d.signal)}</div><div class="fc-insight-row"><span>EMA trend</span>${yesno(d.reasons?.trend_confirmed)}</div><div class="fc-insight-row"><span>MACD / RSI momentum</span>${yesno(d.reasons?.momentum_confirmed)}</div><div class="fc-insight-row"><span>Swing score</span><strong>${esc(d.swing_score??'N/A')}</strong></div><div class="fc-insight-row"><span>Horizon</span><strong>${esc(d.horizon)} sessions</strong></div><p class="fc-method">${esc(d.method)}</p>`;
+  $('fcExplanation').textContent=`${d.assumptions}. ${d.disclaimer}`;
+  forecastDraw();
+ }catch(e){fcData=null;$('fcStatus').textContent='Forecast unavailable: '+e.message;$('fcMetrics').textContent='';$('fcTable').textContent='';$('fcSignalDetail').textContent='Forecast data unavailable.';forecastDraw()}
+}
+function forecastDraw(){
+ const c=$('fcChart');if(!c)return;const frame=c.parentElement;const height=window.innerWidth<=650?340:410;frame.style.height=height+'px';frame.style.minHeight=height+'px';const width=Math.max(320,Math.floor(frame.getBoundingClientRect().width)),dpr=Math.min(window.devicePixelRatio||1,3);
+ c.style.width='100%';c.style.height='100%';const pw=Math.round(width*dpr),ph=Math.round(height*dpr);if(c.width!==pw)c.width=pw;if(c.height!==ph)c.height=ph;
+ const ctx=c.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);if(!fcData)return;
+ const hist=fcData.historical_closes.map(x=>x.close),future=fcData.forecast;const n=hist.length,total=n+future.length;
+ const vals=[...hist,...future.flatMap(x=>[x.low95,x.high95])];let lo=Math.min(...vals),hi=Math.max(...vals);const pad=(hi-lo)*.12||1;lo-=pad;hi+=pad;
+ const L=56,R=18,T=20,B=35,X=i=>L+(i/(total-1))*(width-L-R),Y=v=>T+(hi-v)/(hi-lo)*(height-T-B);
+ ctx.font='12px sans-serif';ctx.strokeStyle='#8895a4';ctx.fillStyle='#8895a4';ctx.lineWidth=1;
+ for(let k=0;k<=4;k++){const v=lo+(hi-lo)*k,y=Y(v);ctx.globalAlpha=.35;ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(width-R,y);ctx.stroke();ctx.globalAlpha=1;ctx.fillText(v.toFixed(2),3,y+4)}
+ function band(lower,upper,color){ctx.beginPath();ctx.moveTo(X(n-1),Y(hist[n-1]));future.forEach((p,j)=>ctx.lineTo(X(n+j),Y(p[upper])));for(let j=future.length-1;j>=0;j--)ctx.lineTo(X(n+j),Y(future[j][lower]));ctx.closePath();ctx.fillStyle=color;ctx.fill()}
+ band('low95','high95','rgba(16,185,129,.10)');band('low80','high80','rgba(16,185,129,.20)');
+ ctx.strokeStyle='#64748b';ctx.lineWidth=2;ctx.beginPath();hist.forEach((v,i)=>i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v)));ctx.stroke();
+ ctx.strokeStyle='#059669';ctx.lineWidth=2.5;ctx.setLineDash([6,4]);ctx.beginPath();ctx.moveTo(X(n-1),Y(hist[n-1]));future.forEach((p,j)=>ctx.lineTo(X(n+j),Y(p.median)));ctx.stroke();ctx.setLineDash([]);
+ ctx.strokeStyle='#8895a4';ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(X(n-1),T);ctx.lineTo(X(n-1),height-B);ctx.stroke();ctx.setLineDash([]);
+ ctx.fillStyle='#8895a4';ctx.fillText('Historical',L,height-8);ctx.fillText('Forecast',Math.max(L,X(n-1)-28),height-8);
+}
+
+// v2.5.2: forecast audit trail; no paper-order calls.
+function forecastPerformanceInit(){
+ $('fcSave').onclick=forecastSave;
+ $('fcScore').onclick=forecastScore;
+ $('fcHistoryRefresh').onclick=forecastPerformanceLoad;
+ $('fcReportRefresh').onclick=forecastReportLoad;
+ $('fcExport').onclick=()=>{const s=$('fcSymbol').value;window.open(API+'/api/forecast/performance/export.csv?symbol='+encodeURIComponent(s),'_blank','noopener')};
+ forecastPerformanceLoad();forecastReportLoad();
+}
+async function forecastSave(){
+ if(!fcData){$('fcPerfStatus').textContent='Generate a forecast first.';return}
+ try{const r=await api(`/api/forecast/${encodeURIComponent(fcData.symbol)}/save?horizon=${fcData.horizon}`,{method:'POST'});
+ $('fcPerfStatus').textContent=r.created?`Saved forecast #${r.id}. Pending settlement.`:`Forecast #${r.id} already saved (immutable).`;await forecastPerformanceLoad(false);await forecastReportLoad()}
+ catch(e){$('fcPerfStatus').textContent='Save failed: '+e.message}
+}
+async function forecastScore(){
+ $('fcPerfStatus').textContent='Fetching closed bars and scoring pending forecasts...';
+ try{const r=await api('/api/forecast/performance/score?symbol='+encodeURIComponent($('fcSymbol').value),{method:'POST'});
+ const errs=Object.entries(r.errors||{}).map(([s,msg])=>s+': '+msg).join('; ');
+ await forecastPerformanceLoad(false);await forecastReportLoad();$('fcPerfStatus').textContent=`Newly scored: ${r.scored}. `+(errs?'Data errors: '+errs:'Remaining pending forecasts require more closed sessions.')}
+ catch(e){$('fcPerfStatus').textContent='Auto-score failed: '+e.message}
+}
+async function forecastPerformanceLoad(showMessage=true){
+ try{const r=await api('/api/forecast/performance/history?symbol='+encodeURIComponent($('fcSymbol').value)+'&limit=300');const m=r.summary;
+ const k=[['Saved',m.total],['Scored',m.scored],['Direction accuracy',m.direction_accuracy_pct==null?'—':m.direction_accuracy_pct+'%'],['MAE',m.mae_usd==null?'—':'$'+Number(m.mae_usd).toFixed(2)],['RMSE',m.rmse_usd==null?'—':'$'+Number(m.rmse_usd).toFixed(2)],['80% / 95% coverage',m.coverage80_pct==null?'—':m.coverage80_pct+'% / '+m.coverage95_pct+'%']];
+ $('fcPerfMetrics').innerHTML=k.map(([a,b])=>`<div class="fc-perf-kpi"><small>${esc(a)}</small><strong>${esc(b)}</strong></div>`).join('');
+ $('fcPerfTable').innerHTML=(r.rows||[]).map(x=>`<tr><td>${esc(x.asof)}</td><td>${esc(x.symbol)}</td><td>${esc(x.horizon)}</td><td>${esc(x.signal)}</td><td>${esc(x.status)}</td><td>${esc(Number(x.predicted_close).toFixed(2))}</td><td>${x.actual_close==null?'—':esc(Number(x.actual_close).toFixed(2))}</td><td>${esc(x.target_date||'—')}</td><td>${x.direction_correct==null?'—':x.direction_correct?'Correct':'Incorrect'}</td><td>${x.abs_error==null?'—':esc(Number(x.abs_error).toFixed(2))}</td></tr>`).join('')||'<tr><td colspan="10">No saved forecasts for this symbol.</td></tr>';
+ if(showMessage)$('fcPerfStatus').textContent=`${m.total} saved, ${m.scored} scored, ${m.pending} pending for ${$('fcSymbol').value}.`;
+ }catch(e){$('fcPerfStatus').textContent='History unavailable: '+e.message}
+}
+
+// v2.5.3: read-only evaluation report; background job handles scoring independently.
+async function forecastReportLoad(){
+ const sym=$('fcSymbol').value;
+ try{
+  const [r,a]=await Promise.all([api('/api/forecast/performance/report?symbol='+encodeURIComponent(sym)),api('/api/forecast/performance/automation')]);
+  const pct=v=>v==null?'—':Number(v).toFixed(1)+'%';
+  const usd=v=>v==null?'—':Number(v).toFixed(2);
+  $('fcReportHorizon').innerHTML=[3,5,10].map(h=>{const x=r.by_horizon[String(h)];return `<tr><td>${h}</td><td>${x.scored}</td><td>${pct(x.direction_accuracy_pct)}</td><td>${usd(x.mae_usd)}</td><td>${pct(x.coverage80_pct)} / ${pct(x.coverage95_pct)}</td></tr>`}).join('');
+  $('fcReportSignal').innerHTML=['Buy','Hold','Sell'].map(sig=>{const x=r.by_signal[sig];return `<tr><td>${sig}</td><td>${x.scored}</td><td>${pct(x.direction_accuracy_pct)}</td><td>${usd(x.mae_usd)}</td></tr>`}).join('');
+  $('fcAutomationStatus').textContent=`Auto-score: ${a.enabled?'Enabled':'Disabled'} · ${a.running?'Running':'Idle'} · Last completed: ${a.last_completed_at||'not yet'} · Last scored: ${a.last_scored} · Errors: ${Object.keys(a.last_errors||{}).length}`;
+  $('fcReportNote').textContent=`Scored sample: ${r.sample_size}. ${r.sample_warning||'Sample threshold reached; results still not guaranteed.'} Model intervals are uncalibrated. No trading P&L is implied.`;
+ }catch(e){$('fcReportNote').textContent='Report unavailable: '+e.message}
 }
