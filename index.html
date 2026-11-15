@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Stock Trading Research & Paper Trading V2.0.1</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>OSE Stock Trading v2.5.4 - Local Preview</title>
+  <link rel="stylesheet" href="styles.css?v=2.5.3" />
 </head>
 <body>
 <header class="topbar">
   <div>
     <h1>Stock Trading Research & Paper Trading</h1>
-    <div class="subtitle">V2.0.1 · Unified Research Signal Engine · Alpaca Paper</div>
+    <div class="subtitle">V2.5.1 · Unified Research Signal Engine · Alpaca Paper</div>
   </div>
   <div class="status-row">
     <span id="systemStatus" class="pill neutral">System: checking…</span>
@@ -21,6 +21,9 @@
 
 <nav class="tabs" id="tabs">
   <button class="tab active" data-tab="overview">Overview</button>
+  <button class="tab" data-tab="dashboard">Dashboard</button>
+  <button class="tab" data-tab="forecast">Forecast v2.5</button>
+  <button class="tab" data-tab="swing">Swing Analytics</button>
   <button class="tab" data-tab="research">Research Signals</button>
   <button class="tab" data-tab="macro">Macro & Sentiment</button>
   <button class="tab" data-tab="paper">Paper Trading</button>
@@ -48,6 +51,64 @@
   <div class="panel"><h2>Open Positions <span class="hint">Green = Profit · Red = Loss</span></h2><div class="tablewrap"><table><thead><tr><th>Symbol</th><th>Qty</th><th>Entry</th><th>Current</th><th>Market Value</th><th>P&amp;L</th><th>P&amp;L %</th></tr></thead><tbody id="positionsBody"></tbody></table></div></div>
 </section>
 
+<section id="dashboard" class="tabpane">
+  <div class="panel">
+    <h2>Technical Dashboard <span class="hint">Alpaca IEX · daily closed candles · research only</span></h2>
+    <div class="dashboard-controls">
+      <label>Symbol <select id="dashSymbol"></select></label>
+      <label>Period <select id="dashPeriod"><option value="30">1M</option><option value="90">3M</option><option value="180" selected>6M</option><option value="365">1Y</option></select></label>
+      <label>Price chart <select id="dashChartType"><option value="candle">Candlesticks</option><option value="line">Line</option></select></label>
+      <label><input type="checkbox" id="dashEMA" checked> EMA20 / EMA50</label>
+      <label><input type="checkbox" id="dashBB"> Bollinger (20,2)</label>
+      <label><input type="checkbox" id="dashLevels" checked> Swing levels</label>
+      <label><input type="checkbox" id="dashATR"> ATR14 panel</label>
+      <button class="btn primary" id="dashRefresh">Refresh chart</button>
+    </div>
+    <p id="dashStatus" class="muted" role="status">Select a symbol to load the chart.</p>
+    <div id="dashMetrics" class="dash-metrics"></div>
+  </div>
+  <div class="panel dash-panel"><h3>Price · EMA · Bollinger · Swing levels</h3><div class="dash-chart-frame" style="height:400px;min-height:400px"><canvas id="dashPrice"></canvas></div></div>
+  <div class="panel dash-panel"><h3>Volume (IEX)</h3><div class="dash-chart-frame" style="height:145px;min-height:145px"><canvas id="dashVolume"></canvas></div></div>
+  <div class="panel dash-panel"><h3>MACD (12, 26, 9) · histogram</h3><div class="dash-chart-frame" style="height:210px;min-height:210px"><canvas id="dashMacd"></canvas></div></div>
+  <div class="panel dash-panel"><h3>RSI (14) · thresholds 30 / 70</h3><div class="dash-chart-frame" style="height:180px;min-height:180px"><canvas id="dashRsi"></canvas></div></div>
+  <div class="panel dash-panel" id="dashAtrPanel" hidden><h3>ATR (14)</h3><div class="dash-chart-frame" style="height:160px;min-height:160px"><canvas id="dashAtr"></canvas></div></div>
+  <p class="hint">Charts use historical IEX data (not consolidated US volume). Signals/levels are scenarios, not orders. 16:30 New York time filter is not an official market calendar. Hover/touch chart to inspect a daily candle.</p>
+</section>
+
+
+<section id="forecast" class="tabpane">
+  <div class="fc-header"><div><div class="fc-eyebrow">OSE STOCK TRADING · RESEARCH</div><h2>Forecast &amp; Trading Signals <span class="fc-version">v2.5.3 · Auto-score & Report</span></h2><p>Statistical scenarios confirmed by Swing Analytics · No automated trading</p></div><span class="fc-tag">MODEL NOT CALIBRATED</span></div>
+  <div class="panel fc-toolbar"><div class="fc-controls"><label>Symbol <select id="fcSymbol"></select></label><label>Forecast horizon <select id="fcHorizon"><option value="3">3 sessions</option><option value="5" selected>5 sessions</option><option value="10">10 sessions</option></select></label><button class="btn primary" id="fcRefresh">Generate forecast</button></div><p id="fcStatus" role="status" aria-live="polite">Select a symbol and generate a forecast.</p></div>
+  <div id="fcMetrics" class="fc-kpis" aria-live="polite"></div>
+  <div class="fc-layout"><div class="panel fc-chart-panel"><div class="fc-panel-head"><div><h3>Price history &amp; forecast</h3><p>Daily closing prices · forecast median with model intervals</p></div><div class="fc-legend"><span><i class="fc-key fc-historical"></i>History</span><span><i class="fc-key fc-median"></i>Median</span><span><i class="fc-key fc-band"></i>80% / 95%</span></div></div><div class="fc-chart-frame"><canvas id="fcChart" role="img" aria-label="Historical closes and future statistical forecast with uncertainty bands"></canvas></div></div>
+  <aside class="panel fc-insights"><h3>Signal explanation</h3><div id="fcSignalDetail">Run a forecast to see the signal and confirmations.</div><div class="fc-caution"><strong>Research only</strong><p>Model probabilities and intervals are not backtested or calibrated. Strong Buy remains disabled. Forecasts are not investment advice.</p></div></aside></div>
+  <div class="panel fc-detail-panel"><div class="fc-panel-head"><div><h3>Forecast by session</h3><p>Projected median and uncertainty intervals in USD</p></div></div><div class="tablewrap"><table class="fc-table"><thead><tr><th>Session</th><th>Median ($)</th><th>80% lower</th><th>80% upper</th><th>95% lower</th><th>95% upper</th></tr></thead><tbody id="fcTable"></tbody></table></div><p class="hint" id="fcExplanation">Statistical scenarios, not guaranteed price targets.</p></div>
+  <div class="panel fc-evaluation"><div class="fc-panel-head"><div><h3>Forecast evaluation report</h3><p>Settled forecasts only · Breakdown by horizon and signal</p></div><button class="btn" id="fcReportRefresh">Refresh report</button></div><p class="hint" id="fcAutomationStatus">Automatic scoring status loading...</p><p class="hint" id="fcReportNote">Statistics appear after forecasts mature.</p><div class="fc-report-grid"><div><h4>By horizon</h4><div class="tablewrap"><table><thead><tr><th>Sessions</th><th>Scored</th><th>Direction</th><th>MAE ($)</th><th>80% / 95%</th></tr></thead><tbody id="fcReportHorizon"></tbody></table></div></div><div><h4>By signal</h4><div class="tablewrap"><table><thead><tr><th>Signal</th><th>Scored</th><th>Direction</th><th>MAE ($)</th></tr></thead><tbody id="fcReportSignal"></tbody></table></div></div></div></div>
+  <div class="panel fc-performance"><div class="fc-panel-head"><div><h3>Forecast Performance &amp; Auto-score</h3><p>Saved forecasts are immutable · scored after H closed trading sessions</p></div><div class="fc-controls"><button id="fcSave" class="btn primary">Save current forecast</button><button id="fcScore" class="btn">Auto-score pending</button><button id="fcHistoryRefresh" class="btn">Refresh history</button><button id="fcExport" class="btn">Export CSV</button></div></div><p class="hint" id="fcPerfStatus" role="status">Generate a forecast, then save it to begin tracking.</p><div class="fc-perf-kpis" id="fcPerfMetrics"></div><div class="tablewrap"><table class="fc-table"><thead><tr><th>As of</th><th>Symbol</th><th>H</th><th>Signal</th><th>Status</th><th>Forecast ($)</th><th>Actual ($)</th><th>Target date</th><th>Direction</th><th>Abs. error ($)</th></tr></thead><tbody id="fcPerfTable"><tr><td colspan="10">No saved forecasts yet.</td></tr></tbody></table></div><p class="hint">Metrics exclude pending forecasts. Hold is not treated as a trade. Historical evaluation starts when forecasts are saved; no retrospective performance is fabricated.</p></div>
+
+  <div class="panel fc-performance" id="fcSchedulerPanel">
+    <div class="fc-panel-head">
+      <div>
+        <h3>Auto Forecast Scheduler ? v2.5.4</h3>
+        <p>NYSE session monitoring ? automatic forecast generation ? read-only</p>
+      </div>
+      <button class="btn" id="fcSchedulerRefresh">Refresh scheduler</button>
+    </div>
+    <p class="hint" id="fcSchedulerStatus" role="status">Scheduler connection not configured.</p>
+    <div class="fc-perf-kpis" id="fcSchedulerMetrics"></div>
+    <p class="hint" id="fcSchedulerErrors"></p>
+  </div>
+</section>
+
+<section id="swing" class="tabpane">
+ <div class="panel"><h2>Swing Trading Analytics v2.3 — Research only</h2><p>15 symbols · Snapshot based on backend responses. Missing fields remain N/A; no fabricated indicators or prices.</p>
+ <label>Account USD <input id="swingCapital" type="number" value="25000" min="1" step="100"></label>
+ <label>Risk/trade % <input id="swingRisk" type="number" value="0.5" min="0.01" max="10" step="0.1"></label>
+ <label>Position cap USD <input id="swingCap" type="number" value="5000" min="1" step="100"></label>
+ <button class="btn" id="swingLoad">Refresh 15 symbols</button> <button class="btn" id="swingCsv">Export CSV</button> <button class="btn" id="swingReport">Tải báo cáo tiếng Việt</button>
+ <p id="swingSource" class="muted">Dữ liệu: Alpaca IEX · Chỉ dùng nến ngày đã hoàn tất · Không phải tín hiệu đặt lệnh.</p><p id="swingStatus">Not loaded. Data availability depends on the configured backend.</p></div>
+ <div class="panel tablewrap"><table><thead><tr><th>Rank</th><th>Score</th><th>Symbol</th><th>Close / reference</th><th>EMA20</th><th>EMA50</th><th>RSI14</th><th>ATR14</th><th>MACD</th><th>Signal</th><th>Entry*</th><th>Stop*</th><th>TP1*</th><th>TP2*</th><th>Max shares*</th></tr></thead><tbody id="swingBody"></tbody></table><p>* Planning levels are calculated only when ATR and a price are supplied by the backend; Entry = max(latest high, prior 20-session high) × 1.003; SL = Entry − 1.2 × ATR14; TP1/TP2 = 1R/2R. Conditional planning levels only, not live triggers.</p></div>
+ </section>
 <section id="research" class="tabpane">
   <div class="toolbar"><label>Symbol <select id="researchSymbol"></select></label><label>Lookback <select id="researchDays"><option>100</option><option selected>300</option><option>500</option></select></label><button id="analyzeBtn" class="btn primary">Analyze</button></div>
   <div class="cards four"><div class="card"><div class="label">Signal</div><div id="signalValue" class="metric">—</div></div><div class="card"><div class="label">Strength</div><div id="signalStrength" class="metric">—</div></div><div class="card"><div class="label">Signal Quality</div><div id="signalQuality" class="metric">—</div></div><div class="card"><div class="label">Last Price</div><div id="signalPrice" class="metric">—</div></div></div>
@@ -105,5 +166,7 @@
 </main>
 
 <footer><strong>Copyright © 2026 Portlogistics.vn. All rights reserved</strong></footer>
-<script src="config.js"></script><script src="app.js"></script>
+<script src="config.js"></script><script src="app.js?v=2.5.3"></script>
+  <script src="fc-scheduler.js"></script>
+  
 </body></html>

@@ -1,4 +1,5 @@
 window.APP_CONFIG = {
-  API_BASE_URL: 'https://ose-stock-trading-backend.onrender.com',
-  VERSION: '2.0.1'
+  API_BASE_URL: '',
+  VERSION: '2.5.4',
+  FORECAST_MONITOR_URL: ''
 };
