@@ -1,5 +1,5 @@
 window.APP_CONFIG = {
   API_BASE_URL: '',
-  VERSION: '2.5.4',
+  VERSION: '2.5.5',
   FORECAST_MONITOR_URL: ''
 };

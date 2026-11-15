@@ -336,3 +336,120 @@ async function forecastReportLoad(){
   $('fcReportNote').textContent=`Scored sample: ${r.sample_size}. ${r.sample_warning||'Sample threshold reached; results still not guaranteed.'} Model intervals are uncalibrated. No trading P&L is implied.`;
  }catch(e){$('fcReportNote').textContent='Report unavailable: '+e.message}
 }
+
+
+/* OSE_UNIFIED_SIGNAL_V255 — research-only cross-timeframe comparison.
+   Original Research and Forecast signals remain unchanged. */
+;(() => {
+  'use strict';
+  const fmt = x => Number.isFinite(Number(x)) ? Number(x).toFixed(2) : '—';
+  const safe = x => String(x ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const symOK = s => /^(SPY|NVDA|MSFT|AAPL|TSLA|GOOGL|ADBE|META|QCOM|AMZN|AVGO|CRWV|INTC|ORCL|PLTR)$/.test(s);
+  const norm = v => String(v ?? '').toUpperCase().trim();
+  const parseTime = v => {
+    const text=String(v ?? '').trim();
+    if (!text) return NaN;
+    const n=Date.parse(text);
+    return Number.isFinite(n) ? n : NaN;
+  };
+  const assess = (research, forecast, symbol, horizon) => {
+    const a=research?.analysis || {};
+    const d=research?.diagnostics || {};
+    const rs=norm(a.signal), fs=norm(forecast?.signal);
+    const quality=(a.quality === null || a.quality === undefined || String(a.quality).trim() === '') ? NaN : Number(a.quality);
+    const rDate=parseTime(d.last_bar_timestamp), fDate=parseTime(forecast?.asof);
+    const ageR=(Date.now()-rDate)/86400000, ageF=(Date.now()-fDate)/86400000;
+    const sameSymbol=norm(research?.symbol)===symbol && norm(forecast?.symbol)===symbol;
+    const sameHorizon=Number(forecast?.horizon)===horizon;
+    const dateAligned=Number.isFinite(rDate) && Number.isFinite(fDate) && Math.abs(rDate-fDate)<=5*86400000;
+    // Compare against recent US market weekdays rather than five calendar days.
+    // Conservative holiday grace; does not claim an exchange-calendar guarantee.
+    const nyDay = value => {const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(value));const get=k=>parts.find(p=>p.type===k)?.value;return `${get('year')}-${get('month')}-${get('day')}`;};
+    const midnightUTC = ymd => { const parts=ymd.match(/\d+/g); if(!parts || parts.length<3) return NaN; return Date.UTC(Number(parts[0]),Number(parts[1])-1,Number(parts[2])); };
+    const weekdaysSince = t => {
+      if(!Number.isFinite(t)) return Infinity;
+      const latest=midnightUTC(nyDay(Date.now()));
+      const start=midnightUTC(nyDay(t));
+      const delta=Math.round((latest-start)/86400000);
+      if(!Number.isFinite(delta) || delta < -1 || delta>30) return Infinity;
+      let weekdays=0;
+      for(let i=1;i<=Math.max(0,delta);i++){const wd=new Date(start+i*86400000).getUTCDay(); if(wd!==0 && wd!==6)weekdays++;}
+      return weekdays;
+    };
+    const marketDaysR=weekdaysSince(rDate), marketDaysF=weekdaysSince(fDate);
+    const freshness=marketDaysR<=4 && marketDaysF<=4 && ageR>=-1 && ageF>=-1;
+    const notes=[];
+    if (!sameSymbol || !sameHorizon) notes.push('Mã hoặc kỳ hạn không khớp');
+    if (!dateAligned) notes.push('Ngày dữ liệu không đủ gần nhau');
+    if (!freshness) notes.push('Dữ liệu quá cũ hoặc thiếu mốc thời gian (4 ngày làm việc gần nhất; chưa xử lý đầy đủ lịch nghỉ NYSE)');
+    if (!Number.isFinite(quality)) notes.push('Thiếu Research Quality');
+    else if (quality<0.70) notes.push('Research Quality '+fmt(quality)+' < 0.70');
+    let state='WAIT';
+    if (sameSymbol && sameHorizon && dateAligned && freshness && ['BUY','SELL'].includes(rs) && ['BUY','SELL'].includes(fs) && rs!==fs) state='CONFLICT';
+    else if (sameSymbol && sameHorizon && dateAligned && freshness && (rs==='HOLD' || fs==='HOLD')) state='WAIT';
+    else if (sameSymbol && sameHorizon && dateAligned && freshness && Number.isFinite(quality) && quality<0.70) state='LOW QUALITY';
+    else if (sameSymbol && sameHorizon && dateAligned && freshness && Number.isFinite(quality) && quality>=0.70 && rs===fs && ['BUY','SELL'].includes(rs)) state=rs+' CONFIRMED';
+    return {state,rs,fs,quality,ageR,ageF,notes,d,forecast};
+  };
+  const block = `<div class="ose-u-header"><strong>Unified Signal Validation · v2.5.5</strong><span class="ose-u-label">Research only · Không đặt lệnh</span></div><div class="ose-u-controls"><label>Mã <select class="ose-u-symbol"></select></label><label>Forecast <select class="ose-u-horizon"><option value="3">3 phiên</option><option value="5" selected>5 phiên</option><option value="10">10 phiên</option></select></label><button type="button" class="btn ose-u-compare">Compare signals</button></div><div class="ose-u-result" role="status" aria-live="polite">Nhấn Compare signals để đối chiếu Research 1H và Forecast 1D.</div><div class="ose-u-disclaimer">Chỉ đối chiếu hai mô hình; không phải tín hiệu giao dịch đã backtest. Quality không phải xác suất thắng.</div>`;
+  function inject() {
+    const research=document.getElementById('research');
+    const forecast=document.getElementById('forecast');
+    if (!research || !forecast) return;
+    const symbols=['SPY','NVDA','MSFT','AAPL','TSLA','GOOGL','ADBE','META','QCOM','AMZN','AVGO','CRWV','INTC','ORCL','PLTR'];
+    const html=block.replace('<select class="ose-u-symbol"></select>',`<select class="ose-u-symbol">${symbols.map(s=>`<option value="${s}">${s}</option>`).join('')}</select>`);
+    for(const [pane,anchor] of [[research,research.querySelector('.cards')],[forecast,forecast.querySelector('.fc-header')]]) {
+      const section=document.createElement('div');
+      section.className='panel ose-unified-panel';
+      section.innerHTML=html;
+      if(anchor) anchor.insertAdjacentElement('afterend',section); else pane.prepend(section);
+      const symbol=section.querySelector('.ose-u-symbol');
+      const horizon=section.querySelector('.ose-u-horizon');
+      let requestSerial=0;
+      const invalidate=()=>{requestSerial++;section.querySelector('.ose-u-result').textContent='Thông số đã thay đổi — nhấn Compare signals để tính lại.';};
+      symbol.addEventListener('change',invalidate);
+      horizon.addEventListener('change',invalidate);
+      const sourceSelect=document.getElementById(pane===research?'researchSymbol':'fcSymbol');
+      const copySymbol=()=>{const v=norm(sourceSelect?.value);if(symOK(v)) symbol.value=v;};
+      copySymbol();
+      sourceSelect?.addEventListener('change',()=>{requestSerial++;copySymbol();section.querySelector('.ose-u-result').textContent='Mã đã thay đổi — cần Compare signals lại.';});
+      if(pane===forecast){const fh=document.getElementById('fcHorizon');if(fh){horizon.value=fh.value;fh.addEventListener('change',()=>{requestSerial++;horizon.value=fh.value;section.querySelector('.ose-u-result').textContent='Kỳ hạn đã thay đổi — cần Compare signals lại.';});}}
+      section.querySelector('.ose-u-compare').addEventListener('click',async()=>{
+        const btn=section.querySelector('.ose-u-compare'); const out=section.querySelector('.ose-u-result');
+        const s=norm(symbol.value), h=Number(horizon.value);
+        const sourceValue=norm(sourceSelect?.value), sourceHorizon=pane===forecast?Number(document.getElementById('fcHorizon')?.value):h;
+        const currentRequest=++requestSerial;
+        const isCurrent=()=>currentRequest===requestSerial && norm(symbol.value)===s && Number(horizon.value)===h && norm(sourceSelect?.value)===sourceValue && (pane!==forecast || Number(document.getElementById('fcHorizon')?.value)===sourceHorizon);
+        if(!symOK(s)||![3,5,10].includes(h)){out.textContent='Mã hoặc kỳ hạn không hợp lệ';return;}
+        btn.disabled=true;out.textContent='Đang tải dữ liệu mới từ hai API…';
+        try {
+          const urls=[`/api/research/${encodeURIComponent(s)}?days=300`,`/api/forecast/${encodeURIComponent(s)}?horizon=${h}`];
+          const [r,f]=await Promise.all(urls.map(async u=>{const resp=await fetch(u,{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}});if(!resp.ok)throw Error('HTTP '+resp.status+' ('+u.split('?')[0]+')');return resp.json();}));
+          if(!isCurrent())return; const z=assess(r,f,s,h); const kind=z.state==='CONFLICT'?'ose-u-conflict':z.state==='LOW QUALITY'?'ose-u-low':z.state.endsWith('CONFIRMED')?'ose-u-confirmed':'ose-u-wait';
+          const desc=[`Research 1H: ${z.rs||'N/A'} · Quality: ${fmt(z.quality)}`,`Forecast 1D / ${h} phiên: ${z.fs||'N/A'} · Model P(up): ${fmt(Number(f.model_probability_up)*100)}%`,`Mốc 1H: ${z.d.last_bar_timestamp||'N/A'} · Daily: ${f.asof||'N/A'}`,...z.notes];
+          out.innerHTML=`<span class="ose-u-state ${kind}">${safe(z.state)}</span><div>${desc.map(s=>`<div>${safe(s)}</div>`).join('')}</div>`;
+        } catch(e) {if(isCurrent())out.textContent='Không xác minh được tín hiệu: '+String(e.message||e);}
+        finally {if(currentRequest===requestSerial)btn.disabled=false;}
+      });
+    }
+    // Daily closed candles are NOT tick-level realtime. Optional polling only during NYSE regular session.
+    const refresh=[...document.querySelectorAll('button')].find(b=>b.textContent.trim().toLowerCase()==='refresh chart');
+    if(refresh){
+      const host=refresh.parentElement;
+      const wrap=document.createElement('label');wrap.className='ose-daily-auto';
+      wrap.innerHTML='<input type="checkbox"> Auto refresh 5m (Daily, not live) <span class="ose-daily-timestamp"></span>';
+      host.appendChild(wrap);
+      const checkbox=wrap.querySelector('input'),stamp=wrap.querySelector('.ose-daily-timestamp');
+      function marketOpen(){const p=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date());const v=k=>p.find(x=>x.type===k)?.value; const wd=v('weekday'),mins=Number(v('hour'))*60+Number(v('minute'));return !['Sat','Sun'].includes(wd)&&mins>=570&&mins<960;}
+      window.setInterval(()=>{
+        if(!checkbox.checked||document.hidden||!marketOpen())return;
+        const pane=refresh.closest('.tabpane'); if(pane&&pane.getClientRects().length===0)return;
+        refresh.click();stamp.textContent='· refreshed '+new Date().toLocaleTimeString('vi-VN');
+      },300000);
+    }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',inject,{once:true}); else inject();
+})();
+
+
+/* OSE_V255_SAFETY_HOTFIX_380 */

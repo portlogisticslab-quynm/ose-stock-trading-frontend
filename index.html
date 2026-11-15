@@ -22,7 +22,7 @@
 <nav class="tabs" id="tabs">
   <button class="tab active" data-tab="overview">Overview</button>
   <button class="tab" data-tab="dashboard">Dashboard</button>
-  <button class="tab" data-tab="forecast">Forecast v2.5</button>
+  <button class="tab" data-tab="forecast">Forecast v2.5.5</button>
   <button class="tab" data-tab="swing">Swing Analytics</button>
   <button class="tab" data-tab="research">Research Signals</button>
   <button class="tab" data-tab="macro">Macro & Sentiment</button>
@@ -77,7 +77,7 @@
 
 
 <section id="forecast" class="tabpane">
-  <div class="fc-header"><div><div class="fc-eyebrow">OSE STOCK TRADING · RESEARCH</div><h2>Forecast &amp; Trading Signals <span class="fc-version">v2.5.3 · Auto-score & Report</span></h2><p>Statistical scenarios confirmed by Swing Analytics · No automated trading</p></div><span class="fc-tag">MODEL NOT CALIBRATED</span></div>
+  <div class="fc-header"><div><div class="fc-eyebrow">OSE STOCK TRADING · RESEARCH</div><h2>Forecast &amp; Trading Signals <span class="fc-version">v2.5.5 · Auto-score & Report</span></h2><p>Statistical scenarios confirmed by Swing Analytics · No automated trading</p></div><span class="fc-tag">MODEL NOT CALIBRATED</span></div>
   <div class="panel fc-toolbar"><div class="fc-controls"><label>Symbol <select id="fcSymbol"></select></label><label>Forecast horizon <select id="fcHorizon"><option value="3">3 sessions</option><option value="5" selected>5 sessions</option><option value="10">10 sessions</option></select></label><button class="btn primary" id="fcRefresh">Generate forecast</button></div><p id="fcStatus" role="status" aria-live="polite">Select a symbol and generate a forecast.</p></div>
   <div id="fcMetrics" class="fc-kpis" aria-live="polite"></div>
   <div class="fc-layout"><div class="panel fc-chart-panel"><div class="fc-panel-head"><div><h3>Price history &amp; forecast</h3><p>Daily closing prices · forecast median with model intervals</p></div><div class="fc-legend"><span><i class="fc-key fc-historical"></i>History</span><span><i class="fc-key fc-median"></i>Median</span><span><i class="fc-key fc-band"></i>80% / 95%</span></div></div><div class="fc-chart-frame"><canvas id="fcChart" role="img" aria-label="Historical closes and future statistical forecast with uncertainty bands"></canvas></div></div>
@@ -89,8 +89,8 @@
   <div class="panel fc-performance" id="fcSchedulerPanel">
     <div class="fc-panel-head">
       <div>
-        <h3>Auto Forecast Scheduler ? v2.5.4</h3>
-        <p>NYSE session monitoring ? automatic forecast generation ? read-only</p>
+        <h3>Auto Forecast Scheduler · v2.5.5</h3>
+        <p>NYSE session monitoring · automatic forecast generation · read-only</p>
       </div>
       <button class="btn" id="fcSchedulerRefresh">Refresh scheduler</button>
     </div>
